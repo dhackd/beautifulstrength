@@ -1,33 +1,30 @@
 from flask import Flask
 from flask_restful import Resource, Api
+from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import default_exceptions
+
 import requests, jsonify
-import re
-from bs4 import BeautifulSoup
+import settings
 
 app = Flask(__name__)
+
+
+@app.errorhandler(Exception)
+def handle_error(e):
+    code = 500
+    if isinstance(e, HTTPException):
+        code = e.code
+    return jsonify(error=str(e)), code
+
+    for ex in default_exceptions:
+        app.register_error_handler(ex, handle_error)
+
 api = Api(app)
+api.prefix = '/api'
 
-class getWod(Resource):
-    def get(self,yymmdd):
-        webpage = requests.get('https://teddygym.com/wod/tdg-'+yymmdd)
-        html = webpage.text
-        new_html = re.sub('<br>','\n',html)
-        soup = BeautifulSoup(new_html,'html.parser')
+from endpoints.wod.resource import getWod
 
-        contents = soup.find_all('div',{'class':'sqs-block-content'})
-        x = contents[1]
-        p = x.find_all('p')
-        res = list()
-        for x in p:
-            res.append(x.string)
-            res.append('\n')
-
-        c = ''.join(res)
-        self.body = c
-        self.status_code = 200
-        return {'status_code':self.status_code, 'WOD':self.body}
-
-api.add_resource(getWod,'/api/wods/<string:yymmdd>')
+api.add_resource(getWod, '/wods', '/wods/<string:yymmdd>')
 
 if __name__ == '__main__':
-    app.run(host='192.168.1.138',debug=True)
+    app.run(host=settings.HOST,debug=True)
